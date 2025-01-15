@@ -9,7 +9,7 @@
 #include <ctype.h>
 #include <string.h>
 
-typedef enum FFLogoSize
+typedef enum __attribute__((__packed__)) FFLogoSize
 {
     FF_LOGO_SIZE_UNKNOWN,
     FF_LOGO_SIZE_NORMAL,
@@ -605,7 +605,8 @@ void ffLogoPrint(void)
         ffStrbufIgnCaseEqualS(&terminal->processName, "kitty") ||
         ffStrbufIgnCaseEqualS(&terminal->processName, "konsole") ||
         ffStrbufIgnCaseEqualS(&terminal->processName, "wezterm") ||
-        ffStrbufIgnCaseEqualS(&terminal->processName, "wayst");
+        ffStrbufIgnCaseEqualS(&terminal->processName, "wayst") ||
+        ffStrbufIgnCaseEqualS(&terminal->processName, "ghostty");
 
     //Try to load the logo as an image. If it succeeds, print it and return.
     if(logoPrintImageIfExists(supportsKitty ? FF_LOGO_TYPE_IMAGE_KITTY : FF_LOGO_TYPE_IMAGE_CHAFA, false))

@@ -1,7 +1,6 @@
 #include "fastfetch.h"
 #include "common/processing.h"
 #include "common/io/io.h"
-#include "common/time.h"
 #include "util/stringUtils.h"
 #include "util/mallocHelper.h"
 
@@ -90,6 +89,16 @@ const char* ffProcessAppendOutput(FFstrbuf* buffer, char* const argv[], bool use
                 waitpid(childPid, NULL, 0);
                 return "poll(&pollfd, 1, timeout) timeout (try increasing --processing-timeout)";
             }
+            else if (errno == EINTR)
+            {
+                // The child process has been terminated. See `chldSignalHandler` in `common/init.c`
+                if (waitpid(childPid, NULL, WNOHANG) == childPid)
+                {
+                    // Read remaining data from the pipe
+                    fcntl(childPipeFd, F_SETFL, O_CLOEXEC | O_NONBLOCK);
+                    childPid = -1;
+                }
+            }
             else if (pollfd.revents & POLLERR)
             {
                 kill(childPid, SIGTERM);
@@ -104,7 +113,7 @@ const char* ffProcessAppendOutput(FFstrbuf* buffer, char* const argv[], bool use
         else if (nRead == 0)
         {
             int stat_loc = 0;
-            if (waitpid(childPid, &stat_loc, 0) == childPid)
+            if (childPid > 0 && waitpid(childPid, &stat_loc, 0) == childPid)
             {
                 if (!WIFEXITED(stat_loc))
                     return "child process exited abnormally";
@@ -113,10 +122,15 @@ const char* ffProcessAppendOutput(FFstrbuf* buffer, char* const argv[], bool use
                 // We only handle 127 as an error. See `getTerminalVersionUrxvt` in `terminalshell.c`
                 return NULL;
             }
-            return "waitpid() failed";
+            return NULL;
         }
         else if (nRead < 0)
-            break;
+        {
+            if (errno == EAGAIN)
+                return NULL;
+            else
+                break;
+        }
     };
 
     return "read(childPipeFd, str, FF_PIPE_BUFSIZ) failed";
@@ -147,7 +161,7 @@ void ffProcessGetInfoLinux(pid_t pid, FFstrbuf* processName, FFstrbuf* exe, cons
         if (length > 0) // doesn't contain trailing NUL
         {
             buf[length] = '\0';
-            ffStrbufEnsureFixedLengthFree(exePath, (uint32_t)length + 1); // +1 for the NUL
+            ffStrbufEnsureFixedLengthFree(exePath, (uint32_t)length);
             ffStrbufAppendNS(exePath, (uint32_t)length, buf);
         }
     }
@@ -158,10 +172,8 @@ void ffProcessGetInfoLinux(pid_t pid, FFstrbuf* processName, FFstrbuf* exe, cons
     int mibs[] = { CTL_KERN, KERN_PROCARGS2, pid };
     if (sysctl(mibs, ARRAY_SIZE(mibs), NULL, &len, NULL, 0) == 0)
     {// try get arg0
-        #ifndef MAC_OS_X_VERSION_10_15
         //don't know why if don't let len longer, proArgs2 and len will change during the following sysctl() in old MacOS version.
         len++;
-        #endif
         FF_AUTO_FREE char* const procArgs2 = malloc(len);
         if (sysctl(mibs, ARRAY_SIZE(mibs), procArgs2, &len, NULL, 0) == 0)
         {
@@ -195,11 +207,12 @@ void ffProcessGetInfoLinux(pid_t pid, FFstrbuf* processName, FFstrbuf* exe, cons
     }
     else
     {
-        ffStrbufEnsureFixedLengthFree(exe, PATH_MAX);
-        int length = proc_pidpath(pid, exe->chars, exe->allocated);
+        char buf[PROC_PIDPATHINFO_MAXSIZE];
+        int length = proc_pidpath(pid, buf, ARRAY_SIZE(buf));
         if (length > 0)
         {
-            exe->length = (uint32_t) length;
+            ffStrbufEnsureFixedLengthFree(exe, (uint32_t) length);
+            ffStrbufAppendNS(exe, (uint32_t) length, buf);
             if (exePath)
                 ffStrbufSet(exePath, exe);
         }
@@ -275,7 +288,7 @@ void ffProcessGetInfoLinux(pid_t pid, FFstrbuf* processName, FFstrbuf* exe, cons
         if (length > 0) // doesn't contain trailing NUL
         {
             buf[length] = '\0';
-            ffStrbufEnsureFixedLengthFree(exePath, (uint32_t)length + 1); // +1 for the NUL
+            ffStrbufEnsureFixedLengthFree(exePath, (uint32_t)length);
             ffStrbufAppendNS(exePath, (uint32_t)length, buf);
         }
     }

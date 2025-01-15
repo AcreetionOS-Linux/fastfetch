@@ -1,7 +1,15 @@
 #include "fastfetch.h"
 #include "opengl.h"
+#include "common/io/io.h"
 
 #include <string.h>
+
+#if __ANDROID__ && !defined(FF_HAVE_EGL)
+    // On Android, installing OpenGL headers is enough (mesa-dev)
+    #if __has_include(<EGL/egl.h>)
+        #define FF_HAVE_EGL 1
+    #endif
+#endif
 
 #if defined(FF_HAVE_EGL) || defined(FF_HAVE_GLX) || defined(FF_HAVE_OSMESA)
 #define FF_HAVE_GL 1
@@ -139,6 +147,8 @@ static const char* detectByGlx(FFOpenGLResult* result)
     FF_LIBRARY_LOAD_SYMBOL_VAR_MESSAGE(glx, data, XFreePixmap);
     FF_LIBRARY_LOAD_SYMBOL_VAR_MESSAGE(glx, data, XCloseDisplay);
     FF_LIBRARY_LOAD_SYMBOL_VAR_MESSAGE(glx, data, XFree);
+
+    FF_SUPPRESS_IO();
 
     return glxHandleData(result, &data);
 }

@@ -6,8 +6,6 @@
 
 #include <math.h>
 
-#define FF_DISPLAY_NUM_FORMAT_ARGS 19
-
 static int sortByNameAsc(FFDisplayResult* a, FFDisplayResult* b)
 {
     return ffStrbufComp(&a->name, &b->name);
@@ -91,7 +89,7 @@ void ffPrintDisplay(FFDisplayOptions* options)
         }
         else
         {
-            FF_PARSE_FORMAT_STRING_CHECKED(&key, &options->moduleArgs.key, 4, ((FFformatarg[]){
+            FF_PARSE_FORMAT_STRING_CHECKED(&key, &options->moduleArgs.key, ((FFformatarg[]) {
                 FF_FORMAT_ARG(moduleIndex, "index"),
                 FF_FORMAT_ARG(result->name, "name"),
                 FF_FORMAT_ARG(displayType, "type"),
@@ -124,11 +122,21 @@ void ffPrintDisplay(FFDisplayOptions* options)
             if (inch > 1)
                 ffStrbufAppendF(&buffer, " in %i\"", (uint32_t) (inch + 0.5));
 
-            if(result->type != FF_DISPLAY_TYPE_UNKNOWN)
-                ffStrbufAppendS(&buffer, result->type == FF_DISPLAY_TYPE_BUILTIN ? " [Built-in]" : " [External]");
+            bool flag = false;
+            if (result->type != FF_DISPLAY_TYPE_UNKNOWN)
+            {
+                ffStrbufAppendS(&buffer, result->type == FF_DISPLAY_TYPE_BUILTIN ? " [Built-in" : " [External");
+                flag = true;
+            }
 
             if (result->hdrStatus == FF_DISPLAY_HDR_STATUS_ENABLED)
-                ffStrbufAppendS(&buffer, " [HDR]");
+            {
+                ffStrbufAppendS(&buffer, flag ? ", HDR" : " [HDR");
+                flag = true;
+            }
+
+            if (flag)
+                ffStrbufAppendS(&buffer, "]");
 
             if(moduleIndex > 0 && result->primary)
                 ffStrbufAppendS(&buffer, " *");
@@ -138,8 +146,9 @@ void ffPrintDisplay(FFDisplayOptions* options)
         }
         else
         {
-            double ppi = sqrt(result->width * result->width + result->height * result->height) / inch;
+            double ppi = inch == 0 ? 0 : sqrt(result->width * result->width + result->height * result->height) / inch;
             bool hdrEnabled = result->hdrStatus == FF_DISPLAY_HDR_STATUS_ENABLED;
+            bool hdrCompatible = result->hdrStatus == FF_DISPLAY_HDR_STATUS_SUPPORTED || result->hdrStatus == FF_DISPLAY_HDR_STATUS_ENABLED;
             uint32_t iInch = (uint32_t) (inch + 0.5), iPpi = (uint32_t) (ppi + 0.5);
 
             char refreshRate[16];
@@ -153,6 +162,17 @@ void ffPrintDisplay(FFDisplayOptions* options)
             else
                 refreshRate[0] = 0;
 
+            char preferredRefreshRate[16];
+            if(result->preferredRefreshRate > 0)
+            {
+                if(options->preciseRefreshRate)
+                    snprintf(preferredRefreshRate, ARRAY_SIZE(preferredRefreshRate), "%g", ((int) (result->preferredRefreshRate * 1000 + 0.5)) / 1000.0);
+                else
+                    snprintf(preferredRefreshRate, ARRAY_SIZE(preferredRefreshRate), "%i", (uint32_t) (result->preferredRefreshRate + 0.5));
+            }
+            else
+                preferredRefreshRate[0] = 0;
+
             char buf[32];
             if (result->serial)
             {
@@ -162,7 +182,9 @@ void ffPrintDisplay(FFDisplayOptions* options)
             else
                 buf[0] = '\0';
 
-            FF_PRINT_FORMAT_CHECKED(key.chars, 0, &options->moduleArgs, FF_PRINT_TYPE_NO_CUSTOM_KEY, FF_DISPLAY_NUM_FORMAT_ARGS, ((FFformatarg[]) {
+            double scaleFactor = (double) result->width / (double) result->scaledWidth;
+
+            FF_PRINT_FORMAT_CHECKED(key.chars, 0, &options->moduleArgs, FF_PRINT_TYPE_NO_CUSTOM_KEY, ((FFformatarg[]) {
                 FF_FORMAT_ARG(result->width, "width"),
                 FF_FORMAT_ARG(result->height, "height"),
                 FF_FORMAT_ARG(refreshRate, "refresh-rate"),
@@ -182,6 +204,11 @@ void ffPrintDisplay(FFDisplayOptions* options)
                 FF_FORMAT_ARG(result->manufactureWeek, "manufacture-week"),
                 FF_FORMAT_ARG(buf, "serial"),
                 FF_FORMAT_ARG(result->platformApi, "platform-api"),
+                FF_FORMAT_ARG(hdrCompatible, "hdr-compatible"),
+                FF_FORMAT_ARG(scaleFactor, "scale-factor"),
+                FF_FORMAT_ARG(result->preferredWidth, "preferred-width"),
+                FF_FORMAT_ARG(result->preferredHeight, "preferred-height"),
+                FF_FORMAT_ARG(preferredRefreshRate, "preferred-refresh-rate"),
             }));
         }
     }
@@ -338,16 +365,21 @@ void ffGenerateDisplayJsonResult(FF_MAYBE_UNUSED FFDisplayOptions* options, yyjs
         yyjson_mut_val* output = yyjson_mut_obj_add_obj(doc, obj, "output");
         yyjson_mut_obj_add_uint(doc, output, "width", item->width);
         yyjson_mut_obj_add_uint(doc, output, "height", item->height);
+        yyjson_mut_obj_add_real(doc, output, "refreshRate", item->refreshRate);
 
         yyjson_mut_val* scaled = yyjson_mut_obj_add_obj(doc, obj, "scaled");
         yyjson_mut_obj_add_uint(doc, scaled, "width", item->scaledWidth);
         yyjson_mut_obj_add_uint(doc, scaled, "height", item->scaledHeight);
 
+        yyjson_mut_val* preferred = yyjson_mut_obj_add_obj(doc, obj, "preferred");
+        yyjson_mut_obj_add_uint(doc, preferred, "width", item->preferredWidth);
+        yyjson_mut_obj_add_uint(doc, preferred, "height", item->preferredHeight);
+        yyjson_mut_obj_add_real(doc, preferred, "refreshRate", item->preferredRefreshRate);
+
         yyjson_mut_val* physical = yyjson_mut_obj_add_obj(doc, obj, "physical");
         yyjson_mut_obj_add_uint(doc, physical, "width", item->physicalWidth);
         yyjson_mut_obj_add_uint(doc, physical, "height", item->physicalHeight);
 
-        yyjson_mut_obj_add_real(doc, obj, "refreshRate", item->refreshRate);
         yyjson_mut_obj_add_uint(doc, obj, "rotation", item->rotation);
         yyjson_mut_obj_add_uint(doc, obj, "bitDepth", item->bitDepth);
         if (item->hdrStatus == FF_DISPLAY_HDR_STATUS_UNKNOWN)
@@ -401,44 +433,45 @@ void ffGenerateDisplayJsonResult(FF_MAYBE_UNUSED FFDisplayOptions* options, yyjs
     }
 }
 
-void ffPrintDisplayHelpFormat(void)
-{
-    FF_PRINT_MODULE_FORMAT_HELP_CHECKED(FF_DISPLAY_MODULE_NAME, "{1}x{2} @ {3}Hz (as {4}x{5}) [{7}]", FF_DISPLAY_NUM_FORMAT_ARGS, ((const char* []) {
-        "Screen width (in pixels) - width",
-        "Screen height (in pixels) - height",
-        "Screen refresh rate (in Hz) - refresh-rate",
-        "Screen scaled width (in pixels) - scaled-width",
-        "Screen scaled height (in pixels) - scaled-height",
-        "Screen name - name",
-        "Screen type (builtin, external or unknown) - type",
-        "Screen rotation (in degrees) - rotation",
-        "True if being the primary screen - is-primary",
-        "Screen physical width (in millimeters) - physical-width",
-        "Screen physical height (in millimeters) - physical-height",
-        "Physical diagonal length in inches - inch",
-        "Pixels per inch (PPI) - ppi",
-        "Bits per color channel - bit-depth",
-        "True if high dynamic range (HDR) mode is enabled - hdr-enabled",
-        "Year of manufacturing - manufacture-year",
-        "Nth week of manufacturing in the year - manufacture-week",
-        "Serial number - serial",
-        "The platform API used when detecting the display - platform-api",
-    }));
-}
+static FFModuleBaseInfo ffModuleInfo = {
+    .name = FF_DISPLAY_MODULE_NAME,
+    .description = "Print resolutions, refresh rates, etc",
+    .parseCommandOptions = (void*) ffParseDisplayCommandOptions,
+    .parseJsonObject = (void*) ffParseDisplayJsonObject,
+    .printModule = (void*) ffPrintDisplay,
+    .generateJsonResult = (void*) ffGenerateDisplayJsonResult,
+    .generateJsonConfig = (void*) ffGenerateDisplayJsonConfig,
+    .formatArgs = FF_FORMAT_ARG_LIST(((FFModuleFormatArg[]) {
+        {"Screen configured width (in pixels)", "width"},
+        {"Screen configured height (in pixels)", "height"},
+        {"Screen configured refresh rate (in Hz)", "refresh-rate"},
+        {"Screen scaled width (in pixels)", "scaled-width"},
+        {"Screen scaled height (in pixels)", "scaled-height"},
+        {"Screen name", "name"},
+        {"Screen type (builtin, external or unknown)", "type"},
+        {"Screen rotation (in degrees)", "rotation"},
+        {"True if being the primary screen", "is-primary"},
+        {"Screen physical width (in millimeters)", "physical-width"},
+        {"Screen physical height (in millimeters)", "physical-height"},
+        {"Physical diagonal length in inches", "inch"},
+        {"Pixels per inch (PPI)", "ppi"},
+        {"Bits per color channel", "bit-depth"},
+        {"True if high dynamic range (HDR) mode is enabled", "hdr-enabled"},
+        {"Year of manufacturing", "manufacture-year"},
+        {"Nth week of manufacturing in the year", "manufacture-week"},
+        {"Serial number", "serial"},
+        {"The platform API used when detecting the display", "platform-api"},
+        {"True if the display is HDR compatible", "hdr-compatible"},
+        {"HiDPI scale factor", "scale-factor"},
+        {"Screen preferred width (in pixels)", "preferred-width"},
+        {"Screen preferred height (in pixels)", "preferred-height"},
+        {"Screen preferred refresh rate (in Hz)", "preferred-refresh-rate"},
+    }))
+};
 
 void ffInitDisplayOptions(FFDisplayOptions* options)
 {
-    ffOptionInitModuleBaseInfo(
-        &options->moduleInfo,
-        FF_DISPLAY_MODULE_NAME,
-        "Print resolutions, refresh rates, etc",
-        ffParseDisplayCommandOptions,
-        ffParseDisplayJsonObject,
-        ffPrintDisplay,
-        ffGenerateDisplayJsonResult,
-        ffPrintDisplayHelpFormat,
-        ffGenerateDisplayJsonConfig
-    );
+    options->moduleInfo = ffModuleInfo;
     ffOptionInitModuleArg(&options->moduleArgs, "󰍹");
     options->compactType = FF_DISPLAY_COMPACT_TYPE_NONE;
     options->preciseRefreshRate = false;

@@ -40,7 +40,6 @@ Some distros package an outdated fastfetch version. Older versions receive no su
 * openSUSE: `zypper install fastfetch`
 * ALT Linux: `apt-get install fastfetch`
 * Exherbo: `cave resolve --execute app-misc/fastfetch`
-* GNU Guix: `guix install fastfetch`
 * Solus: `eopkg install fastfetch`
 * Slackware: `sbopkg -i fastfetch`
 * Void Linux: `xbps-install fastfetch`
@@ -194,15 +193,48 @@ See [#1096](https://github.com/fastfetch-cli/fastfetch/issues/1096).
 
 Neofetch incorrectly counts `rc` packages ( the package has been removed, but that the configuration files remain ). Bug https://github.com/dylanaraps/neofetch/issues/2278
 
-### Q: I use Debian / Ubuntu / Debian deserved distro. My GPU is detected as `XXXX Device XXXX (VGA compatible)`. Is it a bug?
+### Q: I use Debian / Ubuntu / Debian derived distro. My GPU is detected as `XXXX Device XXXX (VGA compatible)`. Is it a bug?
 
 Try upgrading `pci.ids`: Download <https://pci-ids.ucw.cz/v2.2/pci.ids> and overwrite file `/usr/share/hwdata/pci.ids`. For AMD GPUs, you should also upgrade `amdgpu.ids`: Download <https://gitlab.freedesktop.org/mesa/drm/-/raw/main/data/amdgpu.ids> and overwrite file `/usr/share/libdrm/amdgpu.ids`
 
 Alternatively, you may try to use `fastfetch --gpu-driver-specific`, so that `fastfetch` will try to ask the driver for GPU name if supported.
 
+### Q: I get error `Authorization required, but no authorization protocol specified` when running fastfetch in root
+
+Try `export XAUTHORITY=$HOME/.Xauthority`
+
 ### Q: Fastfetch cannot detect my awesome 3rd-party macOS window manager!
 
 Try `fastfetch --wm-detect-plugin`. See also [#984](https://github.com/fastfetch-cli/fastfetch/issues/984)
+
+### Q: How can I change the colors of my ASCII logo?
+
+Try `fastfetch --logo-color-[1-9] <color>`. `[1-9]` is the index of color placeholders.
+
+For example: `fastfetch --logo-color-1 red --logo-color-2 green`.
+
+In JSONC, you can use:
+
+```jsonc
+{
+    "logo": {
+        "color": {
+            "1": "red",
+            "2": "green"
+        }
+    }
+}
+```
+
+### Q: How to hide a key?
+
+Set the key to a white space.
+
+```jsonc
+{
+    "key": " "
+}
+```
 
 ### Q: I want feature A / B / C. Will fastfetch support it?
 

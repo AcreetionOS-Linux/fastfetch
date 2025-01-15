@@ -16,7 +16,7 @@ const char* FF_GPU_VENDOR_NAME_MICROSOFT = "Microsoft";
 const char* FF_GPU_VENDOR_NAME_REDHAT = "RedHat";
 const char* FF_GPU_VENDOR_NAME_ORACLE = "Oracle";
 
-const char* ffGetGPUVendorString(unsigned vendorId)
+const char* ffGPUGetVendorString(unsigned vendorId)
 {
     // https://devicehunt.com/all-pci-vendors
     switch (vendorId)
@@ -51,9 +51,9 @@ const char* detectByOpenGL(FFlist* gpus)
     {
         FFGPUResult* gpu = (FFGPUResult*) ffListAdd(gpus);
         gpu->type = FF_GPU_TYPE_UNKNOWN;
-        ffStrbufInit(&gpu->vendor);
+        ffStrbufInitMove(&gpu->vendor, &result.vendor);
         ffStrbufInitMove(&gpu->name, &result.renderer);
-        ffStrbufInitMove(&gpu->driver, &result.vendor);
+        ffStrbufInit(&gpu->driver);
         ffStrbufInitF(&gpu->platformApi, "OpenGL %s", result.version.chars);
         gpu->index = FF_GPU_INDEX_UNSET;
         gpu->temperature = FF_GPU_TEMP_UNSET;

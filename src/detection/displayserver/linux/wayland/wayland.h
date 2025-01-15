@@ -9,7 +9,7 @@
 
 #include "../displayserver_linux.h"
 
-typedef enum WaylandProtocolType
+typedef enum __attribute__((__packed__)) WaylandProtocolType
 {
     FF_WAYLAND_PROTOCOL_TYPE_NONE,
     FF_WAYLAND_PROTOCOL_TYPE_GLOBAL,
@@ -36,9 +36,12 @@ typedef struct WaylandDisplay
     WaylandData* parent;
     int32_t width;
     int32_t height;
+    int32_t refreshRate;
+    int32_t preferredWidth;
+    int32_t preferredHeight;
+    int32_t preferredRefreshRate;
     int32_t physicalWidth;
     int32_t physicalHeight;
-    int32_t refreshRate;
     double scale;
     enum wl_output_transform transform;
     FFDisplayType type;

@@ -186,7 +186,8 @@
                     "data-raw": "Text data, printed as is",
                     "sixel": "Image file, printed as sixel codes",
                     "kitty": "Image file, printed as kitty graphics protocol",
-                    "kitty_direct": "Image file, tell the terminal emulator to read image data from the specified file (Supported by kitty and wezterm)",
+                    "kitty-direct": "Image file, tell the terminal emulator to read image data from the specified file (Supported by kitty and wezterm)",
+                    "kitty-icat": "Image file, use `kitten icat` to display the image. Requires binary `kitten` to be installed",
                     "iterm": "Image file, printed as iterm graphics protocol",
                     "chafa": "Image file, printed as ascii art using libchafa",
                     "raw": "Image file, printed as raw binary string",
@@ -346,6 +347,14 @@
         {
             "long": "kitty-direct",
             "desc": "Short for --logo-type kitty-direct --logo <path>",
+            "remark": "See \"--help logo-type\" for more info",
+            "arg": {
+                "type": "path"
+            }
+        },
+        {
+            "long": "kitty-icat",
+            "desc": "Short for --logo-type kitty-icat --logo <path>",
             "remark": "See \"--help logo-type\" for more info",
             "arg": {
                 "type": "path"
@@ -1599,6 +1608,24 @@
             ],
             "arg": {
                 "type": "num"
+            },
+            "pseudo": true
+        },
+        {
+            "long": "<module>-percent-type",
+            "desc": "Set the percentage output type",
+            "remark": [
+                "0 for use global `--percent-type` value",
+                "1 for percentage number",
+                "2 for multi-color bar",
+                "3 for both",
+                "6 for bar only",
+                "9 for colored number",
+                "10 for monochrome bar"
+            ],
+            "arg": {
+                "type": "num",
+                "default": 0
             },
             "pseudo": true
         },

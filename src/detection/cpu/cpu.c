@@ -16,6 +16,7 @@ const char* ffDetectCPU(const FFCPUOptions* options, FFCPUResult* cpu)
     ffStrbufRemoveStrings(&cpu->name, ARRAY_SIZE(removeStrings), removeStrings);
     ffStrbufSubstrBeforeFirstC(&cpu->name, '@'); //Cut the speed output in the name as we append our own
     ffStrbufTrimRight(&cpu->name, ' '); //If we removed the @ in previous step there was most likely a space before it
+    ffStrbufRemoveDupWhitespaces(&cpu->name);
     return NULL;
 }
 
@@ -37,6 +38,8 @@ const char* ffCPUAppleCodeToName(uint32_t code)
         case 6031:
         case 6034: return "Apple M3 Max";
         case 8132: return "Apple M4";
+        case 6040: return "Apple M4 Pro";
+        case 6041: return "Apple M4 Max";
         default: return NULL;
     }
 }

@@ -6,8 +6,6 @@
 #include "modules/cpu/cpu.h"
 #include "util/stringUtils.h"
 
-#define FF_CPU_NUM_FORMAT_ARGS 9
-
 static int sortCores(const FFCPUCore* a, const FFCPUCore* b)
 {
     return (int)b->freq - (int)a->freq;
@@ -55,6 +53,9 @@ void ffPrintCPU(FFCPUOptions* options)
 
             FF_STRBUF_AUTO_DESTROY str = ffStrbufCreate();
 
+            if(cpu.packages > 1)
+                ffStrbufAppendF(&str, "%u x ", cpu.packages);
+
             if(cpu.name.length > 0)
                 ffStrbufAppend(&str, &cpu.name);
             else if(cpu.vendor.length > 0)
@@ -96,7 +97,7 @@ void ffPrintCPU(FFCPUOptions* options)
 
             FF_STRBUF_AUTO_DESTROY tempStr = ffStrbufCreate();
             ffTempsAppendNum(cpu.temperature, &tempStr, options->tempConfig, &options->moduleArgs);
-            FF_PRINT_FORMAT_CHECKED(FF_CPU_MODULE_NAME, 0, &options->moduleArgs, FF_PRINT_TYPE_DEFAULT, FF_CPU_NUM_FORMAT_ARGS, ((FFformatarg[]){
+            FF_PRINT_FORMAT_CHECKED(FF_CPU_MODULE_NAME, 0, &options->moduleArgs, FF_PRINT_TYPE_DEFAULT, ((FFformatarg[]){
                 FF_FORMAT_ARG(cpu.name, "name"),
                 FF_FORMAT_ARG(cpu.vendor, "vendor"),
                 FF_FORMAT_ARG(cpu.coresPhysical, "cores-physical"),
@@ -106,6 +107,7 @@ void ffPrintCPU(FFCPUOptions* options)
                 FF_FORMAT_ARG(freqMax, "freq-max"),
                 FF_FORMAT_ARG(tempStr, "temperature"),
                 FF_FORMAT_ARG(coreTypes, "core-types"),
+                FF_FORMAT_ARG(cpu.packages, "packages"),
             }));
         }
     }
@@ -203,6 +205,10 @@ void ffGenerateCPUJsonResult(FFCPUOptions* options, yyjson_mut_doc* doc, yyjson_
         yyjson_mut_val* obj = yyjson_mut_obj_add_obj(doc, module, "result");
         yyjson_mut_obj_add_strbuf(doc, obj, "cpu", &cpu.name);
         yyjson_mut_obj_add_strbuf(doc, obj, "vendor", &cpu.vendor);
+        if (cpu.packages == 0)
+            yyjson_mut_obj_add_null(doc, obj, "packages");
+        else
+            yyjson_mut_obj_add_uint(doc, obj, "packages", cpu.packages);
 
         yyjson_mut_val* cores = yyjson_mut_obj_add_obj(doc, obj, "cores");
         yyjson_mut_obj_add_uint(doc, cores, "physical", cpu.coresPhysical);
@@ -228,34 +234,31 @@ void ffGenerateCPUJsonResult(FFCPUOptions* options, yyjson_mut_doc* doc, yyjson_
     ffStrbufDestroy(&cpu.vendor);
 }
 
-void ffPrintCPUHelpFormat(void)
-{
-    FF_PRINT_MODULE_FORMAT_HELP_CHECKED(FF_CPU_MODULE_NAME, "{1} ({5}) @ {7} GHz", FF_CPU_NUM_FORMAT_ARGS, ((const char* []) {
-        "Name - name",
-        "Vendor - vendor",
-        "Physical core count - cores-physical",
-        "Logical core count - cores-logical",
-        "Online core count - cores-online",
-        "Base frequency (formatted) - freq-base",
-        "Max frequency (formatted) - freq-max",
-        "Temperature (formatted) - temperature",
-        "Logical core count grouped by frequency - core-types",
-    }));
-}
+static FFModuleBaseInfo ffModuleInfo = {
+    .name = FF_CPU_MODULE_NAME,
+    .description = "Print CPU name, frequency, etc",
+    .parseCommandOptions = (void*) ffParseCPUCommandOptions,
+    .parseJsonObject = (void*) ffParseCPUJsonObject,
+    .printModule = (void*) ffPrintCPU,
+    .generateJsonResult = (void*) ffGenerateCPUJsonResult,
+    .generateJsonConfig = (void*) ffGenerateCPUJsonConfig,
+    .formatArgs = FF_FORMAT_ARG_LIST(((FFModuleFormatArg[]) {
+        {"Name", "name"},
+        {"Vendor", "vendor"},
+        {"Physical core count", "cores-physical"},
+        {"Logical core count", "cores-logical"},
+        {"Online core count", "cores-online"},
+        {"Base frequency (formatted)", "freq-base"},
+        {"Max frequency (formatted)", "freq-max"},
+        {"Temperature (formatted)", "temperature"},
+        {"Logical core count grouped by frequency", "core-types"},
+        {"Processor package count", "packages"},
+    }))
+};
 
 void ffInitCPUOptions(FFCPUOptions* options)
 {
-    ffOptionInitModuleBaseInfo(
-        &options->moduleInfo,
-        FF_CPU_MODULE_NAME,
-        "Print CPU name, frequency, etc",
-        ffParseCPUCommandOptions,
-        ffParseCPUJsonObject,
-        ffPrintCPU,
-        ffGenerateCPUJsonResult,
-        ffPrintCPUHelpFormat,
-        ffGenerateCPUJsonConfig
-    );
+    options->moduleInfo = ffModuleInfo;
     ffOptionInitModuleArg(&options->moduleArgs, "");
     options->temp = false;
     options->tempConfig = (FFColorRangeConfig) { 60, 80 };

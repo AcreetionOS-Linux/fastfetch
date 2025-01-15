@@ -59,7 +59,12 @@ static const char* detectFrequency(FFCPUResult* cpu)
         pMax = pMax > pStart[i] ? pMax : pStart[i];
 
     if (pMax > 0)
-        cpu->frequencyMax = pMax / 1000 / 1000;
+    {
+        if (pMax > 100000000) // Assume that pMax is in Hz, M1~M3
+            cpu->frequencyMax = pMax / 1000 / 1000;
+        else // Assume that pMax is in kHz, M4 and later (#1394)
+            cpu->frequencyMax = pMax / 1000;
+    }
 
     return NULL;
 }
@@ -104,6 +109,7 @@ const char* ffDetectCPUImpl(const FFCPUOptions* options, FFCPUResult* cpu)
         return "sysctlbyname(machdep.cpu.brand_string) failed";
 
     ffSysctlGetString("machdep.cpu.vendor", &cpu->vendor);
+    cpu->packages = (uint16_t) ffSysctlGetInt("hw.packages", 1);
     if (cpu->vendor.length == 0 && ffStrbufStartsWithS(&cpu->name, "Apple "))
         ffStrbufAppendS(&cpu->vendor, "Apple");
 
